@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BIM Model Viewer</title>
+  <script type="module" src="./vendor/model-viewer.min.js"></script>
+  <style>
+    :root {
+      --bg: #eef1f4;
+      --panel: rgba(255, 255, 255, 0.92);
+      --text: #17202a;
+      --muted: #5f6c7b;
+      --accent: #146c94;
+      --danger: #b42318;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(135deg, rgba(20, 108, 148, 0.16), transparent 42%),
+        linear-gradient(315deg, rgba(52, 78, 65, 0.16), transparent 45%),
+        var(--bg);
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      --poster-color: transparent;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .brand,
+    .status,
+    .error {
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      min-width: 0;
+      padding: 12px 14px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .brand p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      min-width: 44px;
+      height: 44px;
+      border: 1px solid rgba(23, 32, 42, 0.14);
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    button:hover {
+      border-color: rgba(20, 108, 148, 0.45);
+    }
+
+    .status,
+    .error {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 4;
+      max-width: min(560px, calc(100vw - 32px));
+      transform: translateX(-50%);
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .error {
+      display: none;
+      border-color: rgba(180, 35, 24, 0.28);
+      color: var(--danger);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .brand h1 {
+        font-size: 14px;
+      }
+
+      .brand p {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <section class="brand" aria-label="项目信息">
+      <h1>BIM 模型查看</h1>
+      <p>拖动旋转，滚轮或双指缩放，右键或双指平移</p>
+    </section>
+    <div class="actions">
+      <button id="resetCamera" type="button" title="重置视角" aria-label="重置视角">↺</button>
+      <button id="fullscreen" type="button" title="全屏查看" aria-label="全屏查看">⛶</button>
+    </div>
+  </div>
+
+  <model-viewer
+    id="viewer"
+    src="./model.glb"
+    camera-controls
+    touch-action="pan-y"
+    shadow-intensity="0.75"
+    exposure="1"
+    loading="eager"
+    reveal="auto"
+    interaction-prompt="auto"
+    camera-orbit="45deg 65deg auto"
+    field-of-view="35deg">
+  </model-viewer>
+
+  <div id="status" class="status">正在加载 model.glb...</div>
+  <div id="error" class="error"></div>
+
+  <script>
+    const viewer = document.querySelector("#viewer");
+    const statusBox = document.querySelector("#status");
+    const errorBox = document.querySelector("#error");
+    const resetButton = document.querySelector("#resetCamera");
+    const fullscreenButton = document.querySelector("#fullscreen");
+
+    function showError(message) {
+      statusBox.classList.add("hidden");
+      errorBox.textContent = message;
+      errorBox.style.display = "block";
+    }
+
+    window.setTimeout(async () => {
+      if (customElements.get("model-viewer")) {
+        return;
+      }
+
+      try {
+        const response = await fetch("./vendor/model-viewer.min.js", { cache: "no-store" });
+        if (!response.ok) {
+          showError("model-viewer.min.js 没有加载成功。请确认 viewer/vendor/model-viewer.min.js 已上传，并通过网页服务器访问。");
+        }
+      } catch (error) {
+        showError("model-viewer.min.js 没有加载成功。请确认 viewer/vendor/model-viewer.min.js 已上传，并通过网页服务器访问。");
+      }
+    }, 30000);
+
+    viewer.addEventListener("load", () => {
+      statusBox.classList.add("hidden");
+    });
+
+    viewer.addEventListener("model-visibility", () => {
+      statusBox.classList.add("hidden");
+    });
+
+    viewer.addEventListener("progress", (event) => {
+      const progress = event.detail?.totalProgress ?? 0;
+      const percent = Math.round(progress * 100);
+      statusBox.textContent = `正在加载 model.glb... ${percent}%`;
+      if (progress >= 1 || viewer.loaded === true) {
+        statusBox.classList.add("hidden");
+      }
+    });
+
+    window.setInterval(() => {
+      if (viewer.loaded === true) {
+        statusBox.classList.add("hidden");
+      }
+    }, 1000);
+
+    viewer.addEventListener("error", () => {
+      showError("没有加载到 model.glb。请确认 viewer 文件夹里已经放入转换后的 model.glb，并通过网页服务器访问。");
+    });
+
+    resetButton.addEventListener("click", () => {
+      viewer.cameraOrbit = "45deg 65deg auto";
+      viewer.fieldOfView = "35deg";
+      viewer.jumpCameraToGoal();
+    });
+
+    fullscreenButton.addEventListener("click", async () => {
+      const target = document.documentElement;
+      if (!document.fullscreenElement) {
+        await target.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>
